@@ -4,4 +4,8 @@ version = "0.1.0"
 description = "PyData Seattle 2025 tutorial: Going from Notebooks to Production Code"
 readme = "README.md"
 requires-python = ">=3.13"
-dependencies = []
+dependencies = [
+    "matplotlib>=3.10.7",
+    "pandas>=2.3.3",
+    "scikit-learn>=1.7.2",
+]

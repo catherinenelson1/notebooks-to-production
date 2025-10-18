@@ -47,11 +47,13 @@ htmlcov/
 *.swo
 *~
 .cursor/
+AGENTS.md
 
 # OS files
 .DS_Store
 Thumbs.db
 Desktop.ini
+*.joblib
 
 # Project-specific
 

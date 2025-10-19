@@ -163,13 +163,13 @@ y_pred_lr = lr.predict(X_test)
 # In[80]:
 
 
-print(classification_report(y_test, y_pred_lr, target_names=['Adelie', 'Gentoo', 'Chinstrap']))
+# print(classification_report(y_test, y_pred_lr, target_names=['Adelie', 'Gentoo', 'Chinstrap']))
 
 
 # In[83]:
 
 
-print(confusion_matrix(y_test, y_pred_lr))
+# print(confusion_matrix(y_test, y_pred_lr))
 
 
 
@@ -192,3 +192,16 @@ encoder.inverse_transform(lr.predict(scaled_data))[0]
 
 print(lr.predict_proba(scaled_data))
 
+scaled_data = scaler.transform([[80, 10, 250, 2500]])
+
+
+# In[85]:
+
+
+encoder.inverse_transform(lr.predict(scaled_data))[0]
+
+
+# In[86]:
+
+
+print(lr.predict_proba(scaled_data))

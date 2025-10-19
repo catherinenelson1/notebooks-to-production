@@ -67,10 +67,11 @@ def predict_new_data(X_new):
     scaler = joblib.load(SCALER_FILENAME)
     scaled_data = scaler.transform(X_new)
     prediction = clf.predict(scaled_data)
+    prediction_prob = clf.predict_proba(scaled_data)[0][prediction[0]]
     # decode the prediction
     encoder = joblib.load(ENCODER_FILENAME)
     predicted_class = encoder.inverse_transform(prediction)
-    return predicted_class[0]
+    return [predicted_class[0], prediction_prob]
 
 
 def run_training_pipeline():
@@ -95,3 +96,4 @@ DATA_FILE_PATH = 'penguins_data.csv'
 if __name__ == "__main__":
     run_training_pipeline()
     print(predict_new_data([[40, 17, 190, 3500]]))
+    print(predict_new_data([[80, 10, 250, 2500]]))

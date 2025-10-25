@@ -179,29 +179,24 @@ y_pred_lr = lr.predict(X_test)
 
 
 scaled_data = scaler.transform([[40, 17, 190, 3500]])
+prediction = lr.predict(scaled_data)
 
-
-# In[85]:
-
-
-encoder.inverse_transform(lr.predict(scaled_data))[0]
 
 
 # In[86]:
 
 
-print(lr.predict_proba(scaled_data))
+print([encoder.inverse_transform(prediction)[0], lr.predict_proba(scaled_data)[0][prediction[0]]])
 
+
+
+
+# In[85]:
 scaled_data = scaler.transform([[80, 10, 250, 2500]])
-
-
-# In[85]:
-
-
-encoder.inverse_transform(lr.predict(scaled_data))[0]
+prediction = lr.predict(scaled_data)
 
 
 # In[86]:
 
+print([encoder.inverse_transform(prediction)[0], lr.predict_proba(scaled_data)[0][prediction[0]]])
 
-print(lr.predict_proba(scaled_data))

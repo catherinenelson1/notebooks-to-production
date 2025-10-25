@@ -1,9 +1,9 @@
-def download_data(file_path):
+def download_data():
     # download the dataset if it doesn't exist already
     # save it to file_path
     pass
 
-def clean_data(file_path):
+def clean_data():
     # load the dataset
     # drop rows with missing values
     # return numpy arrays for features and labels
@@ -17,7 +17,7 @@ def preprocess_data(features, labels):
     # return numpy arrays for X_train, X_test, y_train, y_test
     pass
 
-def train_model(X_train, y_train):
+def train_model(X_train, y_train, X_test, y_test):
     # train a model and save it 
     pass
 

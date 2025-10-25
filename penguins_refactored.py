@@ -1,4 +1,16 @@
 import requests
+import pandas as pd
+import joblib
+
+from sklearn.preprocessing import StandardScaler, LabelEncoder
+from sklearn.model_selection import train_test_split
+from sklearn.linear_model import LogisticRegression
+
+MODEL_FILENAME = 'penguins_model.joblib'
+ENCODER_FILENAME = 'penguins_label_encoder.joblib'
+SCALER_FILENAME = 'penguins_scaler.joblib'
+DATA_FILE_PATH = 'penguins_data.csv'
+
 
 
 def download_data():
@@ -13,8 +25,6 @@ def download_data():
             file.write(response.content)
 
 
-import pandas as pd
-
 def clean_data():
     # drop rows with missing values
     # return numpy arrays for features and labels
@@ -26,11 +36,6 @@ def clean_data():
     labels = df['species'].to_numpy()
     return features, labels
 
-
-from sklearn.preprocessing import StandardScaler, LabelEncoder
-from sklearn.model_selection import train_test_split
-
-import joblib
 
 
 def preprocess_data(features, labels):
@@ -46,8 +51,6 @@ def preprocess_data(features, labels):
     X_train, X_test, y_train, y_test = train_test_split(features_scaled, labels_encoded, test_size=0.2, random_state=42)
     return X_train, X_test, y_train, y_test
 
-
-from sklearn.linear_model import LogisticRegression
 
 
 def train_model(X_train, y_train, X_test, y_test):
@@ -87,11 +90,6 @@ def run_training_pipeline():
     # train model
     train_model(X_train, y_train, X_test, y_test)
 
-
-MODEL_FILENAME = 'penguins_model.joblib'
-ENCODER_FILENAME = 'penguins_label_encoder.joblib'
-SCALER_FILENAME = 'penguins_scaler.joblib'
-DATA_FILE_PATH = 'penguins_data.csv'
 
 if __name__ == "__main__":
     run_training_pipeline()

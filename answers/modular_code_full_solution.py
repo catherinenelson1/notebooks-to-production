@@ -9,7 +9,7 @@ from sklearn.linear_model import LogisticRegression
 MODEL_FILENAME = 'penguins_model.joblib'
 ENCODER_FILENAME = 'penguins_label_encoder.joblib'
 SCALER_FILENAME = 'penguins_scaler.joblib'
-DATA_FILE_PATH = 'penguins_data.csv'
+DATA_FILE_PATH = '../penguins_data.csv'
 
 
 

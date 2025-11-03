@@ -1,15 +1,15 @@
-def download_data():
+def download_data(data_file):
     # download the dataset if it doesn't exist already
     # save it to file_path
     pass
 
-def clean_data():
+def clean_data(data_file):
     # load the dataset
     # drop rows with missing values
     # return numpy arrays for features and labels
     pass
 
-def preprocess_data(features, labels):
+def preprocess_data(features, labels, scaler_file, encoder_file):
     # accepts numpy arrays
     # encode categorical variables
     # scale numerical features
@@ -17,11 +17,11 @@ def preprocess_data(features, labels):
     # return numpy arrays for X_train, X_test, y_train, y_test
     pass
 
-def train_model(X_train, y_train, X_test, y_test):
+def train_model(X_train, y_train, X_test, y_test, model_file):
     # train a model and save it 
     pass
 
-def predict_new_data(X_new):
+def predict_new_data(X_new, model_file, scaler_file, encoder_file):
     # load the model and make predictions
     # return a string of the predicted class
     pass

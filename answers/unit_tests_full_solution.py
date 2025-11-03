@@ -8,7 +8,7 @@ from sklearn.preprocessing import StandardScaler, LabelEncoder
 from sklearn.linear_model import LogisticRegression
     
 
-from penguins_refactored import (
+from modular_code_full_solution import (
     clean_data, preprocess_data, train_model, predict_new_data
 )
 

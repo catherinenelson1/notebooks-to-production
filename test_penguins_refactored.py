@@ -5,6 +5,8 @@ import os
 import joblib
 
 from sklearn.preprocessing import StandardScaler, LabelEncoder
+from sklearn.linear_model import LogisticRegression
+    
 
 from penguins_refactored import (
     clean_data, preprocess_data, train_model, predict_new_data
@@ -14,7 +16,6 @@ MODEL_FILENAME = 'test_penguins_model.joblib'
 ENCODER_FILENAME = 'test_penguins_label_encoder.joblib'
 SCALER_FILENAME = 'test_penguins_scaler.joblib'
 DATA_FILE_PATH = 'test_penguins_data.csv'
-
 
 
 def create_test_data():
@@ -90,9 +91,6 @@ def test_train_model():
 
 def test_predict_new_data():
     """Test prediction with a pre-trained model"""
-    # Create and save a simple model
-    from sklearn.linear_model import LogisticRegression
-    from sklearn.preprocessing import LabelEncoder
     
     # Train a simple model
     X = np.array([[0.1, 0.2, 0.3, 0.4], [0.5, 0.6, 0.7, 0.8], [0.9, 0.8, 0.7, 0.6]])

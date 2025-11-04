@@ -1,0 +1,107 @@
+import numpy as np
+import pandas as pd
+import numpy as np
+import os
+import joblib
+
+from sklearn.preprocessing import StandardScaler, LabelEncoder
+from sklearn.linear_model import LogisticRegression
+    
+
+from modular_code_exercise import (
+    clean_data, preprocess_data, train_model, predict_new_data
+)
+
+MODEL_FILENAME = 'test_penguins_model.joblib'
+ENCODER_FILENAME = 'test_penguins_label_encoder.joblib'
+SCALER_FILENAME = 'test_penguins_scaler.joblib'
+DATA_FILE_PATH = 'test_penguins_data.csv'
+
+
+def create_test_data():
+    test_data = pd.DataFrame({
+        'species': ['Adelie', 'Gentoo', 'Chinstrap', 'Adelie'],
+        'bill_length_mm': [39.1, 46.5, 49.7, None],
+        'bill_depth_mm': [18.7, 14.3, 16.0, None],
+        'flipper_length_mm': [181, 217, 193, None],
+        'body_mass_g': [3750, 5200, 3800, None],
+    })
+    test_data.to_csv(DATA_FILE_PATH, index=False)
+
+
+def test_clean_data():
+    # Arrange - create the data
+    create_test_data()
+    
+    # Act - test the function
+    # TODO: your code here
+
+    # Assert - check results
+    # TODO: your code here
+    
+    # Clean up
+    # TODO: your code here
+
+
+def test_preprocess_data():
+    features = np.array([[1.0, 2.0, 3.0, 4.0],
+                         [5.0, 6.0, 7.0, 8.0],
+                         [9.0, 10.0, 11.0, 12.0]])
+    labels = np.array(['Adelie', 'Gentoo', 'Chinstrap'])
+
+    # TODO: your code here
+
+
+def test_train_model():
+    """Test train_model with simple inputs"""
+    # Create simple test data
+    X_train = np.array([[0.1, 0.2, 0.3, 0.4], [0.5, 0.6, 0.7, 0.8]])
+    X_test = np.array([[0.9, 0.8, 0.7, 0.6]])
+    y_train = np.array([0, 1])
+    y_test = np.array([1])
+    
+    # Test the function
+    train_model(X_train, y_train, X_test, y_test, MODEL_FILENAME)
+    
+    # Check if model file was created
+    assert os.path.exists(MODEL_FILENAME)
+    
+    # Clean up
+    os.remove(MODEL_FILENAME)
+
+
+def test_predict_new_data():
+    """Test prediction with a pre-trained model"""
+    
+    # Train a simple model
+    X = np.array([[0.1, 0.2, 0.3, 0.4], [0.5, 0.6, 0.7, 0.8], [0.9, 0.8, 0.7, 0.6]])
+    y = np.array(['Adelie', 'Gentoo', 'Chinstrap'])
+    
+    # Create and save scaler
+    scaler = StandardScaler()
+    scaler.fit_transform(X)
+    joblib.dump(scaler, SCALER_FILENAME)
+
+    # Create and save encoder
+    encoder = LabelEncoder()
+    encoder.fit(y)
+    joblib.dump(encoder, ENCODER_FILENAME)
+    
+    # Create and save model
+    model = LogisticRegression()
+    model.fit(X, encoder.transform(y))
+    joblib.dump(model, MODEL_FILENAME)
+    
+    # Test the prediction function
+    X_new = np.array([[0.1, 0.2, 0.3, 0.4]])
+    label, prob = predict_new_data(X_new, MODEL_FILENAME, SCALER_FILENAME, ENCODER_FILENAME)
+    
+    # Check the prediction is one of the valid species
+    assert label in ['Adelie', 'Gentoo', 'Chinstrap']
+    assert 0 < prob <= 1.0
+    
+    # Clean up
+    os.remove(MODEL_FILENAME)
+    os.remove(SCALER_FILENAME)
+    os.remove(ENCODER_FILENAME)
+

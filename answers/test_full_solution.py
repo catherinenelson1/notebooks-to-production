@@ -98,7 +98,7 @@ def test_predict_new_data():
     
     # Create and save scaler
     scaler = StandardScaler()
-    features_scaled = scaler.fit_transform(X)
+    scaler.fit_transform(X)
     joblib.dump(scaler, SCALER_FILENAME)
 
     # Create and save encoder

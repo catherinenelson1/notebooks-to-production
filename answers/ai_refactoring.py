@@ -1,429 +1,434 @@
+#!/usr/bin/env python3
 """
-Penguin Species Classification Pipeline
+Penguin Species Classification using Logistic Regression
 
-This module provides a complete pipeline for training and using a logistic regression
-model to classify penguin species based on physical measurements.
+This script trains a logistic regression model to classify penguin species
+based on physical measurements (bill length, bill depth, flipper length, body mass).
 """
 
+import argparse
 import logging
-import sys
+import pickle
 from pathlib import Path
-from typing import Tuple, List
+from typing import Tuple, Optional
 
-import requests
-import pandas as pd
 import numpy as np
-import joblib
-from sklearn.preprocessing import StandardScaler, LabelEncoder
-from sklearn.model_selection import train_test_split
+import pandas as pd
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import classification_report, confusion_matrix
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import LabelEncoder, StandardScaler
 
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.StreamHandler(sys.stdout),
-        logging.FileHandler('penguins_pipeline.log')
-    ]
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
 
-# Constants
-MODEL_FILENAME = 'penguins_lr_model.joblib'
-ENCODER_FILENAME = 'penguins_label_encoder.joblib'
-SCALER_FILENAME = 'penguins_scaler.joblib'
-DATA_FILE_PATH = 'penguins_data.csv'
-DATA_URL = 'https://raw.githubusercontent.com/mwaskom/seaborn-data/refs/heads/master/penguins.csv'
-FEATURE_COLUMNS = ['bill_length_mm', 'bill_depth_mm', 'flipper_length_mm', 'body_mass_g']
-TARGET_COLUMN = 'species'
-RANDOM_STATE = 42
-TEST_SIZE = 0.2
 
-
-def download_data(data_file: str = DATA_FILE_PATH, url: str = DATA_URL) -> None:
-    """
-    Download the penguin dataset if it doesn't exist locally.
+class PenguinClassifier:
+    """Logistic Regression classifier for penguin species prediction."""
     
-    Args:
-        data_file: Path to save the dataset
-        url: URL to download the dataset from
-        
-    Raises:
-        requests.RequestException: If download fails
-        IOError: If file cannot be written
-    """
-    data_path = Path(data_file)
+    FEATURE_COLUMNS = ['bill_length_mm', 'bill_depth_mm', 'flipper_length_mm', 'body_mass_g']
+    TARGET_COLUMN = 'species'
     
-    if data_path.exists():
-        logger.info(f"Dataset already exists at {data_file}")
-        return
+    def __init__(self, random_state: int = 42):
+        """
+        Initialize the classifier.
+        
+        Args:
+            random_state: Random state for reproducibility
+        """
+        self.random_state = random_state
+        self.model = LogisticRegression(random_state=random_state, max_iter=1000)
+        self.scaler = StandardScaler()
+        self.encoder = LabelEncoder()
+        self.is_fitted = False
+        
+    def load_data(self, data_path: str) -> pd.DataFrame:
+        """
+        Load penguin data from CSV file.
+        
+        Args:
+            data_path: Path to the CSV file
+            
+        Returns:
+            DataFrame with loaded data
+        """
+        logger.info(f"Loading data from {data_path}")
+        df = pd.read_csv(data_path)
+        logger.info(f"Loaded {len(df)} rows")
+        return df
     
-    try:
-        logger.info(f"Downloading dataset from {url}")
-        response = requests.get(url, timeout=30)
-        response.raise_for_status()
+    def preprocess_data(self, df: pd.DataFrame) -> pd.DataFrame:
+        """
+        Clean and preprocess the data.
         
-        with open(data_file, 'wb') as file:
-            file.write(response.content)
+        Args:
+            df: Raw DataFrame
+            
+        Returns:
+            Cleaned DataFrame
+        """
+        logger.info("Preprocessing data")
+        initial_rows = len(df)
         
-        logger.info(f"Dataset successfully downloaded to {data_file}")
+        # Drop rows with missing values in required columns
+        required_columns = [self.TARGET_COLUMN] + self.FEATURE_COLUMNS
+        df_clean = df.dropna(subset=required_columns)
         
-    except requests.RequestException as e:
-        logger.error(f"Failed to download dataset: {e}")
-        raise
-    except IOError as e:
-        logger.error(f"Failed to write dataset to file: {e}")
-        raise
-
-
-def load_and_clean_data(data_file: str = DATA_FILE_PATH) -> Tuple[np.ndarray, np.ndarray]:
-    """
-    Load and clean the penguin dataset.
-    
-    Args:
-        data_file: Path to the dataset CSV file
+        # Select only relevant columns
+        df_clean = df_clean[required_columns]
         
-    Returns:
-        Tuple of (features, labels) as numpy arrays
-        
-    Raises:
-        FileNotFoundError: If data file doesn't exist
-        ValueError: If required columns are missing
-        pd.errors.EmptyDataError: If file is empty
-    """
-    try:
-        logger.info(f"Loading data from {data_file}")
-        df = pd.read_csv(data_file)
-        
-        if df.empty:
-            raise ValueError("Dataset is empty")
-        
-        logger.info(f"Dataset loaded with {len(df)} rows")
-        
-        # Check for required columns
-        required_columns = FEATURE_COLUMNS + [TARGET_COLUMN]
-        missing_columns = set(required_columns) - set(df.columns)
-        if missing_columns:
-            raise ValueError(f"Missing required columns: {missing_columns}")
-        
-        # Log missing values
-        missing_counts = df[required_columns].isnull().sum()
-        if missing_counts.any():
-            logger.warning(f"Missing values found:\n{missing_counts[missing_counts > 0]}")
-        
-        # Drop rows with missing values
-        original_len = len(df)
-        df = df.dropna(subset=required_columns)
-        rows_dropped = original_len - len(df)
-        
+        rows_dropped = initial_rows - len(df_clean)
         if rows_dropped > 0:
             logger.info(f"Dropped {rows_dropped} rows with missing values")
         
-        if df.empty:
-            raise ValueError("No data remaining after dropping missing values")
+        logger.info(f"Final dataset: {len(df_clean)} rows")
+        logger.info(f"Species distribution:\n{df_clean[self.TARGET_COLUMN].value_counts()}")
         
-        # Extract features and labels
-        features = df[FEATURE_COLUMNS].to_numpy()
-        labels = df[TARGET_COLUMN].to_numpy()
-        
-        logger.info(f"Cleaned dataset: {len(df)} samples, {features.shape[1]} features")
-        logger.info(f"Class distribution:\n{pd.Series(labels).value_counts().to_dict()}")
-        
-        return features, labels
-        
-    except FileNotFoundError as e:
-        logger.error(f"Data file not found: {data_file}")
-        raise
-    except pd.errors.EmptyDataError as e:
-        logger.error(f"Data file is empty: {data_file}")
-        raise
-    except Exception as e:
-        logger.error(f"Error loading or cleaning data: {e}")
-        raise
-
-
-def preprocess_data(
-    features: np.ndarray,
-    labels: np.ndarray,
-    scaler_file: str = SCALER_FILENAME,
-    encoder_file: str = ENCODER_FILENAME,
-    test_size: float = TEST_SIZE,
-    random_state: int = RANDOM_STATE
-) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
-    """
-    Preprocess features and labels: scale features and encode labels.
+        return df_clean
     
-    Args:
-        features: Raw feature array
-        labels: Raw label array
-        scaler_file: Path to save the fitted scaler
-        encoder_file: Path to save the fitted encoder
-        test_size: Proportion of data to use for testing
-        random_state: Random seed for reproducibility
+    def prepare_features(
+        self, 
+        df: pd.DataFrame, 
+        fit: bool = True
+    ) -> Tuple[np.ndarray, np.ndarray]:
+        """
+        Extract and scale features, encode labels.
         
-    Returns:
-        Tuple of (X_train, X_test, y_train, y_test)
+        Args:
+            df: Preprocessed DataFrame
+            fit: Whether to fit the scaler and encoder (True for training)
+            
+        Returns:
+            Tuple of (scaled_features, encoded_labels)
+        """
+        logger.info("Preparing features and labels")
         
-    Raises:
-        ValueError: If input arrays are invalid
-        IOError: If model files cannot be saved
-    """
-    try:
-        logger.info("Starting data preprocessing")
-        
-        if features.size == 0 or labels.size == 0:
-            raise ValueError("Features or labels array is empty")
-        
-        if len(features) != len(labels):
-            raise ValueError(f"Features and labels have different lengths: {len(features)} vs {len(labels)}")
+        # Extract features and target
+        X = df[self.FEATURE_COLUMNS].to_numpy()
+        y = df[self.TARGET_COLUMN].to_numpy()
         
         # Scale features
-        logger.info("Scaling features")
-        scaler = StandardScaler()
-        features_scaled = scaler.fit_transform(features)
-        
-        # Save scaler
-        joblib.dump(scaler, scaler_file)
-        logger.info(f"Scaler saved to {scaler_file}")
+        if fit:
+            X_scaled = self.scaler.fit_transform(X)
+            logger.info("Fitted StandardScaler on features")
+        else:
+            X_scaled = self.scaler.transform(X)
         
         # Encode labels
-        logger.info("Encoding labels")
-        encoder = LabelEncoder()
-        labels_encoded = encoder.fit_transform(labels)
+        if fit:
+            y_encoded = self.encoder.fit_transform(y)
+            logger.info(f"Fitted LabelEncoder. Classes: {self.encoder.classes_}")
+        else:
+            y_encoded = self.encoder.transform(y)
         
-        # Save encoder
-        joblib.dump(encoder, encoder_file)
-        logger.info(f"Encoder saved to {encoder_file}")
-        logger.info(f"Label mapping: {dict(zip(encoder.classes_, encoder.transform(encoder.classes_)))}")
+        return X_scaled, y_encoded
+    
+    def train(
+        self, 
+        data_path: str, 
+        test_size: float = 0.2
+    ) -> dict:
+        """
+        Train the logistic regression model.
+        
+        Args:
+            data_path: Path to the training data CSV
+            test_size: Proportion of data to use for testing
+            
+        Returns:
+            Dictionary with training metrics
+        """
+        logger.info("Starting training pipeline")
+        
+        # Load and preprocess data
+        df = self.load_data(data_path)
+        df_clean = self.preprocess_data(df)
+        
+        # Prepare features
+        X, y = self.prepare_features(df_clean, fit=True)
         
         # Split data
-        logger.info(f"Splitting data (test_size={test_size}, random_state={random_state})")
         X_train, X_test, y_train, y_test = train_test_split(
-            features_scaled, labels_encoded,
-            test_size=test_size,
-            random_state=random_state,
-            stratify=labels_encoded
+            X, y, test_size=test_size, random_state=self.random_state
         )
-        
-        logger.info(f"Training set: {len(X_train)} samples")
-        logger.info(f"Test set: {len(X_test)} samples")
-        
-        return X_train, X_test, y_train, y_test
-        
-    except Exception as e:
-        logger.error(f"Error during preprocessing: {e}")
-        raise
-
-
-def train_model(
-    X_train: np.ndarray,
-    y_train: np.ndarray,
-    X_test: np.ndarray,
-    y_test: np.ndarray,
-    model_file: str = MODEL_FILENAME,
-    encoder_file: str = ENCODER_FILENAME
-) -> LogisticRegression:
-    """
-    Train a logistic regression model and evaluate it.
-    
-    Args:
-        X_train: Training features
-        y_train: Training labels
-        X_test: Test features
-        y_test: Test labels
-        model_file: Path to save the trained model
-        encoder_file: Path to the label encoder for report
-        
-    Returns:
-        Trained LogisticRegression model
-        
-    Raises:
-        ValueError: If training data is invalid
-        IOError: If model file cannot be saved
-    """
-    try:
-        logger.info("Starting model training")
-        
-        if X_train.size == 0 or y_train.size == 0:
-            raise ValueError("Training data is empty")
+        logger.info(f"Split data: {len(X_train)} train, {len(X_test)} test samples")
         
         # Train model
-        model = LogisticRegression(max_iter=1000, random_state=RANDOM_STATE)
-        model.fit(X_train, y_train)
+        logger.info("Training logistic regression model")
+        self.model.fit(X_train, y_train)
+        self.is_fitted = True
         
-        # Evaluate on training set
-        train_accuracy = model.score(X_train, y_train)
-        logger.info(f"Training accuracy: {train_accuracy:.4f}")
+        # Evaluate
+        y_pred = self.model.predict(X_test)
+        accuracy = self.model.score(X_test, y_test)
         
-        # Evaluate on test set
-        test_accuracy = model.score(X_test, y_test)
-        logger.info(f"Test accuracy: {test_accuracy:.4f}")
+        logger.info(f"Training complete. Test accuracy: {accuracy:.4f}")
         
-        # Generate predictions and detailed metrics
-        y_pred = model.predict(X_test)
+        # Generate detailed metrics
+        report = classification_report(
+            y_test, 
+            y_pred, 
+            target_names=self.encoder.classes_,
+            output_dict=True
+        )
+        conf_matrix = confusion_matrix(y_test, y_pred)
         
-        # Load encoder for class names
-        try:
-            encoder = joblib.load(encoder_file)
-            target_names = encoder.classes_
-        except Exception:
-            target_names = None
-            logger.warning("Could not load encoder for target names")
+        # Log results
+        logger.info("\nClassification Report:")
+        logger.info("\n" + classification_report(
+            y_test, 
+            y_pred, 
+            target_names=self.encoder.classes_
+        ))
+        logger.info(f"\nConfusion Matrix:\n{conf_matrix}")
         
-        # Classification report
-        logger.info("Classification Report:")
-        report = classification_report(y_test, y_pred, target_names=target_names)
-        logger.info(f"\n{report}")
-        
-        # Confusion matrix
-        cm = confusion_matrix(y_test, y_pred)
-        logger.info(f"Confusion Matrix:\n{cm}")
-        
-        # Save model
-        joblib.dump(model, model_file)
-        logger.info(f"Model saved to {model_file}")
-        
-        return model
-        
-    except Exception as e:
-        logger.error(f"Error during model training: {e}")
-        raise
-
-
-def predict(
-    X_new: np.ndarray,
-    model_file: str = MODEL_FILENAME,
-    scaler_file: str = SCALER_FILENAME,
-    encoder_file: str = ENCODER_FILENAME
-) -> List[Tuple[str, float]]:
-    """
-    Make predictions on new data.
+        return {
+            'accuracy': accuracy,
+            'classification_report': report,
+            'confusion_matrix': conf_matrix.tolist(),
+            'test_samples': len(X_test),
+            'train_samples': len(X_train)
+        }
     
-    Args:
-        X_new: New feature data (2D array, shape: [n_samples, n_features])
-        model_file: Path to the trained model
-        scaler_file: Path to the fitted scaler
-        encoder_file: Path to the fitted encoder
+    def predict(
+        self, 
+        features: np.ndarray, 
+        return_proba: bool = False
+    ) -> np.ndarray:
+        """
+        Make predictions on new data.
         
-    Returns:
-        List of tuples (predicted_class, probability) for each sample
+        Args:
+            features: Array of shape (n_samples, 4) with feature values
+            return_proba: Whether to return probability predictions
+            
+        Returns:
+            Array of predicted species or probabilities
+        """
+        if not self.is_fitted:
+            raise ValueError("Model must be trained before making predictions")
         
-    Raises:
-        FileNotFoundError: If model files don't exist
-        ValueError: If input data is invalid
-    """
-    try:
-        logger.info(f"Making predictions on {len(X_new)} samples")
-        
-        # Validate input
-        if X_new.ndim != 2:
-            raise ValueError(f"X_new must be 2D array, got shape {X_new.shape}")
-        
-        if X_new.shape[1] != len(FEATURE_COLUMNS):
-            raise ValueError(f"Expected {len(FEATURE_COLUMNS)} features, got {X_new.shape[1]}")
-        
-        # Load artifacts
-        logger.info("Loading model artifacts")
-        model = joblib.load(model_file)
-        scaler = joblib.load(scaler_file)
-        encoder = joblib.load(encoder_file)
+        # Ensure input is 2D
+        if features.ndim == 1:
+            features = features.reshape(1, -1)
         
         # Scale features
-        X_scaled = scaler.transform(X_new)
+        features_scaled = self.scaler.transform(features)
         
         # Make predictions
-        predictions = model.predict(X_scaled)
-        probabilities = model.predict_proba(X_scaled)
+        if return_proba:
+            predictions = self.model.predict_proba(features_scaled)
+        else:
+            predictions_encoded = self.model.predict(features_scaled)
+            predictions = self.encoder.inverse_transform(predictions_encoded)
         
-        # Decode predictions
-        predicted_classes = encoder.inverse_transform(predictions)
-        
-        # Get probability of predicted class
-        results = []
-        for i, pred_class in enumerate(predicted_classes):
-            pred_idx = predictions[i]
-            pred_prob = probabilities[i][pred_idx]
-            results.append((pred_class, pred_prob))
-            logger.info(f"Sample {i+1}: {pred_class} (probability: {pred_prob:.4f})")
-        
-        return results
-        
-    except FileNotFoundError as e:
-        logger.error(f"Model file not found: {e}")
-        raise
-    except Exception as e:
-        logger.error(f"Error during prediction: {e}")
-        raise
-
-
-def run_training_pipeline(data_file: str = DATA_FILE_PATH) -> None:
-    """
-    Execute the complete training pipeline.
+        return predictions
     
-    Args:
-        data_file: Path to the dataset file
+    def save_model(self, model_path: str) -> None:
+        """
+        Save the trained model and preprocessors to disk.
         
-    Raises:
-        Exception: If any step of the pipeline fails
-    """
-    try:
-        logger.info("=" * 60)
-        logger.info("Starting Penguin Classification Training Pipeline")
-        logger.info("=" * 60)
+        Args:
+            model_path: Path where to save the model
+        """
+        if not self.is_fitted:
+            raise ValueError("Model must be trained before saving")
         
-        # Step 1: Download data
-        download_data(data_file)
+        model_data = {
+            'model': self.model,
+            'scaler': self.scaler,
+            'encoder': self.encoder,
+            'random_state': self.random_state
+        }
         
-        # Step 2: Load and clean data
-        features, labels = load_and_clean_data(data_file)
+        model_path = Path(model_path)
+        model_path.parent.mkdir(parents=True, exist_ok=True)
         
-        # Step 3: Preprocess data
-        X_train, X_test, y_train, y_test = preprocess_data(features, labels)
+        with open(model_path, 'wb') as f:
+            pickle.dump(model_data, f)
         
-        # Step 4: Train model
-        train_model(X_train, y_train, X_test, y_test)
+        logger.info(f"Model saved to {model_path}")
+    
+    def load_model(self, model_path: str) -> None:
+        """
+        Load a trained model from disk.
         
-        logger.info("=" * 60)
-        logger.info("Training pipeline completed successfully!")
-        logger.info("=" * 60)
+        Args:
+            model_path: Path to the saved model
+        """
+        logger.info(f"Loading model from {model_path}")
         
-    except Exception as e:
-        logger.error("=" * 60)
-        logger.error(f"Training pipeline failed: {e}")
-        logger.error("=" * 60)
-        raise
+        with open(model_path, 'rb') as f:
+            model_data = pickle.load(f)
+        
+        self.model = model_data['model']
+        self.scaler = model_data['scaler']
+        self.encoder = model_data['encoder']
+        self.random_state = model_data['random_state']
+        self.is_fitted = True
+        
+        logger.info(f"Model loaded. Classes: {self.encoder.classes_}")
+    
+    def get_feature_importance(self) -> pd.DataFrame:
+        """
+        Get feature importance from model coefficients.
+        
+        Returns:
+            DataFrame with feature importance for each class
+        """
+        if not self.is_fitted:
+            raise ValueError("Model must be trained before getting feature importance")
+        
+        coefficients = self.model.coef_
+        
+        importance_df = pd.DataFrame(
+            coefficients.T,
+            index=self.FEATURE_COLUMNS,
+            columns=self.encoder.classes_
+        )
+        
+        return importance_df
 
 
 def main():
     """Main entry point for the script."""
-    try:
-        # Run training pipeline
-        run_training_pipeline()
+    parser = argparse.ArgumentParser(
+        description='Train or use a penguin species classifier'
+    )
+    
+    subparsers = parser.add_subparsers(dest='command', help='Command to run')
+    
+    # Train command
+    train_parser = subparsers.add_parser('train', help='Train a new model')
+    train_parser.add_argument(
+        '--data',
+        type=str,
+        required=True,
+        help='Path to training data CSV'
+    )
+    train_parser.add_argument(
+        '--output',
+        type=str,
+        default='penguin_model.pkl',
+        help='Path to save the trained model'
+    )
+    train_parser.add_argument(
+        '--test-size',
+        type=float,
+        default=0.2,
+        help='Proportion of data to use for testing'
+    )
+    train_parser.add_argument(
+        '--random-state',
+        type=int,
+        default=42,
+        help='Random state for reproducibility'
+    )
+    
+    # Predict command
+    predict_parser = subparsers.add_parser('predict', help='Make predictions')
+    predict_parser.add_argument(
+        '--model',
+        type=str,
+        required=True,
+        help='Path to trained model'
+    )
+    predict_parser.add_argument(
+        '--bill-length',
+        type=float,
+        required=True,
+        help='Bill length in mm'
+    )
+    predict_parser.add_argument(
+        '--bill-depth',
+        type=float,
+        required=True,
+        help='Bill depth in mm'
+    )
+    predict_parser.add_argument(
+        '--flipper-length',
+        type=float,
+        required=True,
+        help='Flipper length in mm'
+    )
+    predict_parser.add_argument(
+        '--body-mass',
+        type=float,
+        required=True,
+        help='Body mass in grams'
+    )
+    predict_parser.add_argument(
+        '--proba',
+        action='store_true',
+        help='Return probability predictions'
+    )
+    
+    # Feature importance command
+    importance_parser = subparsers.add_parser(
+        'importance', 
+        help='Show feature importance'
+    )
+    importance_parser.add_argument(
+        '--model',
+        type=str,
+        required=True,
+        help='Path to trained model'
+    )
+    
+    args = parser.parse_args()
+    
+    if args.command == 'train':
+        # Train a new model
+        classifier = PenguinClassifier(random_state=args.random_state)
+        metrics = classifier.train(args.data, test_size=args.test_size)
+        classifier.save_model(args.output)
         
-        # Make example predictions
-        logger.info("\n" + "=" * 60)
-        logger.info("Making example predictions")
-        logger.info("=" * 60)
+        print("\nTraining Summary:")
+        print(f"  Accuracy: {metrics['accuracy']:.4f}")
+        print(f"  Train samples: {metrics['train_samples']}")
+        print(f"  Test samples: {metrics['test_samples']}")
+        print(f"  Model saved to: {args.output}")
         
-        # Example 1: Adelie-like measurements
-        example_1 = np.array([[40, 17, 190, 3500]])
-        logger.info(f"Example 1 - Features: {example_1[0].tolist()}")
-        results_1 = predict(example_1)
-        print(f"\nPrediction 1: {results_1[0][0]} (confidence: {results_1[0][1]:.2%})")
+    elif args.command == 'predict':
+        # Load model and make prediction
+        classifier = PenguinClassifier()
+        classifier.load_model(args.model)
         
-        # Example 2: Different measurements
-        example_2 = np.array([[50, 15, 220, 4500]])
-        logger.info(f"Example 2 - Features: {example_2[0].tolist()}")
-        results_2 = predict(example_2)
-        print(f"Prediction 2: {results_2[0][0]} (confidence: {results_2[0][1]:.2%})")
+        features = np.array([[
+            args.bill_length,
+            args.bill_depth,
+            args.flipper_length,
+            args.body_mass
+        ]])
         
-    except Exception as e:
-        logger.error(f"Application failed: {e}")
-        sys.exit(1)
+        prediction = classifier.predict(features, return_proba=args.proba)
+        
+        print("\nPrediction:")
+        if args.proba:
+            print("Probabilities:")
+            for species, prob in zip(classifier.encoder.classes_, prediction[0]):
+                print(f"  {species}: {prob:.4f}")
+        else:
+            print(f"  Species: {prediction[0]}")
+    
+    elif args.command == 'importance':
+        # Show feature importance
+        classifier = PenguinClassifier()
+        classifier.load_model(args.model)
+        
+        importance_df = classifier.get_feature_importance()
+        
+        print("\nFeature Importance (Coefficients):")
+        print(importance_df.to_string())
+    
+    else:
+        parser.print_help()
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()
 
